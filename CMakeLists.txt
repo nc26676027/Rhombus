@@ -23,6 +23,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 option(RHOMBUS_BUILD_TESTS "Enable tests" OFF)
+option(RHOMBUS_BUILD_FACE "Enable face recognition module" OFF)
 
 include(CMakeFindDependencyMacro)
 
@@ -37,6 +38,10 @@ endif()
 message(STATUS "SEAL_INCLUDE_DIR" ${SEAL_INCLUDE_DIR})
 
 add_subdirectory(src)
+
+if(RHOMBUS_BUILD_FACE)
+    add_subdirectory(src/face)
+endif()
 
 if(RHOMBUS_BUILD_TESTS)
     enable_testing()

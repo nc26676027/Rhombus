@@ -109,19 +109,53 @@ Not present in repo:
 
 Each phase has a single owner exit criterion. Do not start phase N+1 until N's exit criterion passes.
 
-### Phase 0 — Preparation (0.5 day)
+### Phase 0 — Preparation (0.5 day) — COMPLETED 2026-06-15
 
 Deliverable: buildable repo + smoke test.
 
-- [ ] Verify `bash scripts/build-deps.sh && bash scripts/build.sh` produces `build/bin/matvec` and `build/bin/matmul` on a Linux x86-64 box. Apple silicon is allowed to skip HEXL; do not block.
-- [ ] Re-run the two existing test binaries; capture baseline numbers.
-- [ ] Add a `scripts/run-tests.sh` that wraps the two binaries and exits non-zero on any `max_diff != 0`.
-- [ ] Pin v1 quantization in `src/face/quant.h`: global symmetric int8, `QUANT_BITS = 8`, `QUANT_RANGE = 127`, `mat_bits = 8`, `vec_bits = 8`. *(Decision confirmed 2026-06-15)*
-- [ ] Create `src/face/` directory structure and `src/face/CMakeLists.txt`.
-- [ ] Add `RHOMBUS_BUILD_FACE` option to top-level `CMakeLists.txt` (default OFF).
-- [ ] Decide whether to enable `USE_HEXL=ON` and `USE_ZSTD=ON` for the dev box; if yes, re-run baselines with them on.
+- [x] Verify `bash scripts/build-deps.sh && bash scripts/build.sh` produces `build/bin/matvec` and `build/bin/matmul` on a Linux x86-64 box. Apple silicon is allowed to skip HEXL; do not block.
+- [x] Re-run the two existing test binaries; capture baseline numbers.
+- [x] Add a `scripts/run-tests.sh` that wraps the two binaries and exits non-zero on any `max_diff != 0`.
+- [x] Pin v1 quantization in `src/face/quant.h`: global symmetric int8, `QUANT_BITS = 8`, `QUANT_RANGE = 127`, `mat_bits = 8`, `vec_bits = 8`. *(Decision confirmed 2026-06-15)*
+- [x] Create `src/face/` directory structure and `src/face/CMakeLists.txt`.
+- [x] Add `RHOMBUS_BUILD_FACE` option to top-level `CMakeLists.txt` (default OFF).
+- [ ] Decide whether to enable `USE_HEXL=ON` and `USE_ZSTD=ON` for the dev box; if yes, re-run baselines with them on. *(Deferred: current dev box has no AVX512; HEXL=OFF, ZSTD=OFF for v1)*
 
 Exit: `scripts/run-tests.sh` is green; baseline numbers recorded in this file.
+
+#### Phase 0 Baseline (aliyunCPU: Ubuntu 22.04 x86-64, 16 cores, GCC 11.4, N=8192, HEXL=OFF, 4 threads)
+
+**test_matvec (PP-MVM):**
+
+| nrows x ncols | avg latency (ms) | max_error |
+|---|---|---|
+| 64 x 256 | 4.56 | 1 |
+| 128 x 256 | 6.00 | 1 |
+| 256 x 256 | 6.94 | 2 |
+| 512 x 256 | 9.27 | 2 |
+| 1024 x 256 | 12.38 | 2 |
+| 2048 x 256 | 17.64 | 2 |
+| 4096 x 256 | 27.46 | 2 |
+| 64 x 1024 | 6.72 | 2 |
+| 128 x 1024 | 8.98 | 1 |
+| 256 x 1024 | 12.03 | 2 |
+| 512 x 1024 | 16.65 | 2 |
+| 1024 x 1024 | 25.80 | 2 |
+| 2048 x 1024 | 49.66 | 2 |
+| 4096 x 1024 | 86.15 | 2 |
+| 64 x 4096 | 12.22 | 1 |
+| 128 x 4096 | 17.38 | 2 |
+| 256 x 4096 | 26.76 | 2 |
+| 512 x 4096 | 45.46 | 2 |
+| 1024 x 4096 | 81.94 | 2 |
+| 2048 x 4096 | 172.52 | 2 |
+| 4096 x 4096 | 355.39 | 2 |
+
+**test_matmul (768x768x128, Expand+V2):**
+- Total time: 935 ms (excl. network)
+- Communication: 3.00 MB
+- max_error: 2
+
 
 ### Phase 1 — HyDia engine (slot-domain EE-MVM) (2–3 days)
 
