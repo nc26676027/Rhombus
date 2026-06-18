@@ -42,6 +42,7 @@ add_subdirectory(src)
 # Copy bootstrapping data files (cosine.txt, inverse_sine.txt) to binary dir
 file(COPY ${CMAKE_SOURCE_DIR}/src/bootstrap/cosine.txt
           ${CMAKE_SOURCE_DIR}/src/bootstrap/inverse_sine.txt
+          ${CMAKE_SOURCE_DIR}/src/bootstrap/arcsin_d127.txt
      DESTINATION ${CMAKE_BINARY_DIR}/bin)
 
 if(RHOMBUS_BUILD_FACE)

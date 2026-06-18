@@ -228,44 +228,49 @@ void ModularReducer::modular_reduction(Ciphertext &rtn, Ciphertext &cipher) {
     cos_tmp1 = cipher;
     Ciphertext sin_rtn, cos_rtn;
 
-    scaling_for_turn_back_q();
-
 	sin_polynomial.homomorphic_poly_evaluation(context, encoder, encryptor, evaluator, relin_keys, cos_tmp2, cos_tmp1, decryptor);
-    // cout << "after sin poly, #q = " << cos_tmp2.coeff_modulus_size() << endl;
+    cout << "[DIAG] after sin poly, #q = " << cos_tmp2.coeff_modulus_size() << " scale=" << log2(cos_tmp2.scale()) << endl;
     {
         for (int i = 0; i < num_double_formula + 1; i++) {
+            cout << "[DIAG] double_angle_formula iteration " << i << ", before: #q=" << cos_tmp2.coeff_modulus_size() << endl;
             double_angle_formula(cos_tmp2);
+            cout << "[DIAG] double_angle_formula iteration " << i << ", after:  #q=" << cos_tmp2.coeff_modulus_size() << endl;
             if (i == num_double_formula - 1) {
                 sin_tmp2 = cos_tmp2;
             }
         }
-        // cout << "after double angle for cos, #q = " << cos_tmp2.coeff_modulus_size() << endl;
+        cout << "[DIAG] after double angle for cos, #q = " << cos_tmp2.coeff_modulus_size() << endl;
     }    
     std::thread thread1([&]() 
     {
         PublicKey dummy_pk;
         SecretKey dummy_sk;
+        cout << "[DIAG] thread1: before eval_polynomial_integrate, cos_tmp2 #q=" << cos_tmp2.coeff_modulus_size() << endl;
         eval_polynomial_integrate(encryptor, evaluator, decryptor, encoder, dummy_pk, dummy_sk, relin_keys, cos_rtn, cos_tmp2, 127, arcsin_decomp_coeff, arcsin_tree);
-        cout << "after eval arcsin, #q = " << cos_rtn.coeff_modulus_size() << endl;
+        cout << "[DIAG] after eval arcsin, #q = " << cos_rtn.coeff_modulus_size() << endl;
         evaluator.add_const_inplace(cos_rtn, abs_lift);
+        cout << "[DIAG] thread1 done, cos_rtn #q=" << cos_rtn.coeff_modulus_size() << endl;
     }
     );
 
     std::thread thread2([&]() 
     {
+        cout << "[DIAG] thread2: before inverse_sin poly, sin_tmp2 #q=" << sin_tmp2.coeff_modulus_size() << endl;
         inverse_sin_polynomial_v1.homomorphic_poly_evaluation(context, encoder, encryptor, evaluator, relin_keys, sin_rtn, sin_tmp2, decryptor);
-        // inverse_sin_polynomial_v1.homomorphic_poly_evaluation_naive(context, encoder, encryptor, evaluator, relin_keys, sin_rtn, sin_tmp2, decryptor);
+        cout << "[DIAG] thread2: after inverse_sin poly, sin_rtn #q=" << sin_rtn.coeff_modulus_size() << endl;
         evaluator.mod_switch_to_next_inplace(sin_rtn);
+        cout << "[DIAG] thread2: after mod_switch, sin_rtn #q=" << sin_rtn.coeff_modulus_size() << endl;
     }
     );
     
     thread1.join(); // rtn = cos_rtn; return;
     thread2.join(); // evaluator.mod_switch_to_next_inplace(sin_rtn); rtn = sin_rtn; return;
 
-    // cout << "cos result scale = " << cos_rtn.scale() << endl;
-    // cout << "sin result scale = " << sin_rtn.scale() << endl;
+    cout << "[mod_red] cos_rtn.scale=" << log2(cos_rtn.scale()) << " sin_rtn.scale=" << log2(sin_rtn.scale()) << endl;
     int64_t ql = (*context.get_context_data(sin_rtn.parms_id())->parms().coeff_modulus().rbegin()).value();
-    evaluator.multiply_const_inplace(sin_rtn, cos_rtn.scale() * ql / sin_rtn.scale() / sin_rtn.scale());
+    double scale_adj = cos_rtn.scale() * ql / sin_rtn.scale() / sin_rtn.scale();
+    cout << "[mod_red] ql=" << log2((double)ql) << " scale_adj=" << log2(abs(scale_adj)) << " adj_sign=" << (scale_adj >= 0 ? "+" : "-") << endl;
+    evaluator.multiply_const_inplace(sin_rtn, scale_adj);
     evaluator.rescale_to_next_inplace(sin_rtn);
     sin_rtn.scale() = cos_rtn.scale();
     evaluator.add(sin_rtn, cos_rtn, rtn);

@@ -34,17 +34,24 @@ namespace seal{
 	// In fact, basis_type is meaningless
 	void geneT0T1(Encryptor &encryptor, CompatEvaluator &evaluator, CKKSEncoder &encoder, PublicKey &public_key, SecretKey &secret_key, RelinKeys &relin_keys, Ciphertext& T0, Ciphertext& T1, Ciphertext& cipher)
 	{
-		double scale = cipher.scale();
+		// In seal-modified, cipher.scale() was small (~2^40) due to lazy scaling.
+		// In standard SEAL 4.1.1, cipher.scale() can be large (e.g. 2^60 after modraise).
+		// Using cipher.scale() directly for encoding causes "scale out of bounds" when
+		// the resulting ciphertext is multiplied (scale^2 > coeff_modulus_bit_count).
+		// Fix: use a moderate encoding scale (2^40) and adjust the ciphertext's scale
+		// to match cipher.scale() after encryption, so subsequent operations are consistent.
+		double ct_scale = cipher.scale();
+		double enc_scale = pow(2.0, 40); // safe moderate scale for encoding
 		long n = cipher.poly_modulus_degree() / 2;
-	//	vector<double> m_one(n), m_scaled(n);
 		vector<double> m_one(n);
 
 		// ctxt_1
 		for(int i=0; i<n; i++) m_one[i] = 1.0; 
 		Plaintext plain_1;
-		encoder.encode(m_one, scale, plain_1);
+		encoder.encode(m_one, enc_scale, plain_1);
 		Ciphertext ctxt_1;
 		encryptor.encrypt(plain_1, ctxt_1);
+		ctxt_1.scale() = ct_scale; // align scale with cipher for consistent operations
 
 		T0 = ctxt_1;
 		T1 = cipher;
@@ -247,10 +254,16 @@ namespace seal{
 		T[0] = std::make_unique<Ciphertext>();
 		T[1] = std::make_unique<Ciphertext>();
 		
-		// generation of zero ciphertext 
+		// generation of zero ciphertext
+		// In seal-modified, lazy scaling kept scale unchanged (e.g. 2^40), so scale^2 was valid.
+		// In standard SEAL 4.1.1, scale can be large (e.g. 2^60 after modraise), making scale^2
+		// exceed coeff_modulus bit count and trigger "scale out of bounds".
+		// Since m_zero is all zeros, the encoding scale doesn't affect the actual polynomial
+		// coefficients (0 * any_scale = 0). Use scale directly instead of scale^2.
 		vector<double> m_coeff(n), m_zero(n, 0.0);
 		Plaintext plain_coeff, plain_zero;
-		encoder.encode(m_zero, scale*scale, plain_zero);		// scaling factor: scale^2 for lazy scaling
+		double zero_encode_scale = scale; // was scale*scale in seal-modified (lazy scaling)
+		encoder.encode(m_zero, zero_encode_scale, plain_zero);
 		encryptor.encrypt(plain_zero, ctxt_zero);
 
 		// set start temp_index

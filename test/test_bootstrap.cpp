@@ -41,7 +41,10 @@ int main() {
     // 1. CKKS params
     section("1. CKKS Parameters");
     size_t poly_deg = 32768;
-    vector<int> bit_sizes = {60, 45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45};
+    // Level budget matching RBOOT: remaining(3) + boot(19) = 22 levels
+    // First prime is 60-bit, rest are 45-bit for standard SEAL.
+    // Need at least 22 primes for bootstrapping depth.
+    vector<int> bit_sizes = {60, 45,45,45, 45,45,45,45,45,45, 45,45,45,45,45,45, 45,45,45,45,45,45};
     int L = (int)bit_sizes.size();
     EncryptionParameters parms(scheme_type::ckks);
     parms.set_poly_modulus_degree(poly_deg);
@@ -73,7 +76,7 @@ int main() {
     section("3. Build Bootstrapper");
     long loge = 10, logn = 14, logNh = 14;
     double final_scale = pow(2.0, 40);
-    long boundary_K = 25, sin_cos_deg = 59, double_angle_iter = 3, inverse_deg = 7;
+    long boundary_K = 25, sin_cos_deg = 59, double_angle_iter = 2, inverse_deg = 127;
 
     auto t0 = chrono::high_resolution_clock::now();
     cout << "  Constructing Bootstrapper..." << endl;
