@@ -11,7 +11,7 @@ Bootstrapper::Bootstrapper(long _loge, long _logn, long _logNh, long _L, double 
     Evaluator &_seal_evaluator, 
     RelinKeys &_relin_keys, 
     GaloisKeys &_gal_keys) :
-	loge(_loge), logn(_logn), logNh(_logNh), L(_L), final_scale(_final_scale), boundary_K(_boundary_K), sin_cos_deg(_sin_cos_deg), double_angle_iterations(_double_angle_iterations), inverse_deg(_inverse_deg), context(_context), keygen(_keygen), encoder(_encoder), encryptor(_encryptor), decryptor(_decryptor), evaluator(_seal_evaluator, _encoder, pow(2.0, _loge)), relin_keys(_relin_keys), gal_keys(_gal_keys) {
+	loge(_loge), logn(_logn), logNh(_logNh), L(_L), final_scale(_final_scale), boundary_K(_boundary_K), sin_cos_deg(_sin_cos_deg), double_angle_iterations(_double_angle_iterations), inverse_deg(_inverse_deg), context(_context), keygen(_keygen), encoder(_encoder), encryptor(_encryptor), decryptor(_decryptor), evaluator(_seal_evaluator, _encoder, _context, pow(2.0, _loge)), relin_keys(_relin_keys), gal_keys(_gal_keys) {
 
 	n = 1 << logn;
 	Nh = 1 << logNh;
@@ -421,6 +421,7 @@ void Bootstrapper::addBootKeys_other_keys(GaloisKeys &gal_keys, vector<int> &oth
 	keygen.create_galois_keys(gal_steps_vector, gal_keys);
 }
 void Bootstrapper::addBootKeys_3_other_keys(GaloisKeys &gal_keys, vector<int> &other_keys) {
+	logn_set.insert(logn);
 	vector<int> gal_steps_vector;
 	gal_steps_vector.push_back(0);
 	for (int i = 0; i < logNh; i++) {

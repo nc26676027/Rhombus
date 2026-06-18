@@ -40,3 +40,7 @@ endif()
 
 target_link_libraries(RhombusBootstrap PUBLIC SEAL::seal NTL::ntl)
 
+# Data generation tool: produces arcsin_d127.txt needed by bootstrapping
+add_executable(gen_arcsin gen_arcsin.cpp)
+target_link_libraries(gen_arcsin PRIVATE RhombusBootstrap SEAL::seal NTL::ntl)
+

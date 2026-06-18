@@ -37,21 +37,35 @@ class CompatEvaluator {
 public:
     Evaluator &evaluator;
     CKKSEncoder &encoder;
+    const SEALContext &context;
     double default_scale;
 
-    CompatEvaluator(Evaluator &ev, CKKSEncoder &enc, double scale)
-        : evaluator(ev), encoder(enc), default_scale(scale) {}
+    CompatEvaluator(Evaluator &ev, CKKSEncoder &enc, const SEALContext &ctx, double scale)
+        : evaluator(ev), encoder(enc), context(ctx), default_scale(scale) {}
 
     // ─── multiply_vector_reduced_error ───
     // ct × vector<complex<double>>
+    // In seal-modified, this function used a fixed scale (2^loge) and did NOT
+    // update the ciphertext's scale field — it operated directly on RNS coeffs.
+    // Standard SEAL's multiply_plain sets result.scale = ct.scale * plain.scale,
+    // which breaks RBOOT's scale chain assumptions.
+    //
+    // Strategy: encode plaintext at default_scale (= 2^loge, matching RBOOT),
+    // then after multiply_plain, force the destination scale back to ct.scale
+    // (matching seal-modified's behavior of not updating the scale field).
+    // This keeps the RNS computation correct but makes the scale field match
+    // what RBOOT's code expects for subsequent rescale operations.
     void multiply_vector_reduced_error(
         const Ciphertext &encrypted,
         const std::vector<std::complex<double>> &coeff_vec,
         Ciphertext &destination)
     {
+        if (coeff_vec.empty()) { destination = encrypted; return; }
         Plaintext plain;
-        encoder.encode(coeff_vec, default_scale, plain);
+        encoder.encode(coeff_vec, encrypted.parms_id(), default_scale, plain);
         evaluator.multiply_plain(encrypted, plain, destination);
+        // Force scale back to ct.scale (seal-modified behavior: scale field unchanged)
+        destination.scale() = encrypted.scale();
     }
 
     // ct × single Plaintext
@@ -97,12 +111,12 @@ public:
     // ─── multiply_const: multiply ciphertext by RR constant ───
     void multiply_const(Ciphertext &ct, const NTL::RR &constant, Ciphertext &dest) {
         Plaintext plain_const;
-        encoder.encode(to_double(constant), ct.scale(), plain_const);
+        encoder.encode(to_double(constant), ct.parms_id(), ct.scale(), plain_const);
         evaluator.multiply_plain(ct, plain_const, dest);
     }
     void multiply_const(Ciphertext &ct, double constant, Ciphertext &dest) {
         Plaintext plain_const;
-        encoder.encode(constant, ct.scale(), plain_const);
+        encoder.encode(constant, ct.parms_id(), ct.scale(), plain_const);
         evaluator.multiply_plain(ct, plain_const, dest);
     }
 
@@ -161,12 +175,9 @@ public:
         evaluator.mod_switch_to_inplace(ct, pid);
     }
 
-    // Plaintext variant: in standard SEAL 4.1, Plaintext doesn't have mod_switch,
-    // but we can achieve the same by re-encoding. However, RBOOT uses this in a
-    // narrow context (aligning plaintext level to ciphertext level), so we simply
-    // set the parms_id on the plaintext directly.
+    // Plaintext variant: standard SEAL 4.1.1 supports mod_switch_to_inplace on Plaintext
     void mod_switch_to_inplace(Plaintext &pt, parms_id_type pid) {
-        pt.parms_id() = pid;
+        evaluator.mod_switch_to_inplace(pt, pid);
     }
     void rotate_rows(Ciphertext &ct, int steps, const GaloisKeys &gk, Ciphertext &dest) {
         evaluator.rotate_rows(ct, steps, gk, dest);
@@ -210,59 +221,53 @@ public:
     // double_inplace: multiply ciphertext by 2 (plaintext scalar 2)
     void double_inplace(Ciphertext &ct) {
         Plaintext plain_two;
-        encoder.encode(2.0, ct.scale(), plain_two);
+        encoder.encode(2.0, ct.parms_id(), ct.scale(), plain_two);
         evaluator.multiply_plain_inplace(ct, plain_two);
-        // No rescale needed if we match the scale properly
     }
 
     // add_const: add a constant to ciphertext (double and NTL::RR overloads)
     void add_const(Ciphertext &ct, double constant, Ciphertext &dest) {
         Plaintext plain_const;
-        encoder.encode(constant, ct.scale(), plain_const);
-        plain_const.parms_id() = ct.parms_id();
+        encoder.encode(constant, ct.parms_id(), ct.scale(), plain_const);
         evaluator.add_plain(ct, plain_const, dest);
     }
     void add_const(Ciphertext &ct, const NTL::RR &constant, Ciphertext &dest) {
         Plaintext plain_const;
-        encoder.encode(to_double(constant), ct.scale(), plain_const);
-        plain_const.parms_id() = ct.parms_id();
+        encoder.encode(to_double(constant), ct.parms_id(), ct.scale(), plain_const);
         evaluator.add_plain(ct, plain_const, dest);
     }
     void add_const(Ciphertext &ct, double constant) {
         Plaintext plain_const;
-        encoder.encode(constant, ct.scale(), plain_const);
-        plain_const.parms_id() = ct.parms_id();
+        encoder.encode(constant, ct.parms_id(), ct.scale(), plain_const);
         evaluator.add_plain_inplace(ct, plain_const);
     }
 
     // add_const_inplace: same as add_const above
     void add_const_inplace(Ciphertext &ct, double constant) {
         Plaintext plain_const;
-        encoder.encode(constant, ct.scale(), plain_const);
-        plain_const.parms_id() = ct.parms_id();
+        encoder.encode(constant, ct.parms_id(), ct.scale(), plain_const);
         evaluator.add_plain_inplace(ct, plain_const);
     }
     void add_const_inplace(Ciphertext &ct, const NTL::RR &constant) {
         Plaintext plain_const;
-        encoder.encode(to_double(constant), ct.scale(), plain_const);
-        plain_const.parms_id() = ct.parms_id();
+        encoder.encode(to_double(constant), ct.parms_id(), ct.scale(), plain_const);
         evaluator.add_plain_inplace(ct, plain_const);
     }
 
     // multiply_const_inplace: multiply ciphertext by a constant (double and NTL::RR overloads)
     void multiply_const_inplace(Ciphertext &ct, double constant) {
         Plaintext plain_const;
-        encoder.encode(constant, ct.scale(), plain_const);
+        encoder.encode(constant, ct.parms_id(), ct.scale(), plain_const);
         evaluator.multiply_plain_inplace(ct, plain_const);
     }
     void multiply_const_inplace(Ciphertext &ct, const NTL::RR &constant) {
         Plaintext plain_const;
-        encoder.encode(to_double(constant), ct.scale(), plain_const);
+        encoder.encode(to_double(constant), ct.parms_id(), ct.scale(), plain_const);
         evaluator.multiply_plain_inplace(ct, plain_const);
     }
     void multiply_const_inplace(Ciphertext &ct, double constant, Ciphertext &dest) {
         Plaintext plain_const;
-        encoder.encode(constant, ct.scale(), plain_const);
+        encoder.encode(constant, ct.parms_id(), ct.scale(), plain_const);
         evaluator.multiply_plain(ct, plain_const, dest);
     }
 
@@ -270,12 +275,12 @@ public:
     // In seal-modified this aligned the output scale. Here we just do multiply_plain.
     void multiply_const_inplace_fit_to_scale(Ciphertext &ct, const NTL::RR &constant, double /*scale_to_align*/) {
         Plaintext plain_const;
-        encoder.encode(to_double(constant), ct.scale(), plain_const);
+        encoder.encode(to_double(constant), ct.parms_id(), ct.scale(), plain_const);
         evaluator.multiply_plain_inplace(ct, plain_const);
     }
     void multiply_const_inplace_fit_to_scale(Ciphertext &ct, const NTL::RR &constant, const NTL::RR &/*scale_to_align*/) {
         Plaintext plain_const;
-        encoder.encode(to_double(constant), ct.scale(), plain_const);
+        encoder.encode(to_double(constant), ct.parms_id(), ct.scale(), plain_const);
         evaluator.multiply_plain_inplace(ct, plain_const);
     }
 
