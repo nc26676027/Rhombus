@@ -39,6 +39,11 @@ message(STATUS "SEAL_INCLUDE_DIR" ${SEAL_INCLUDE_DIR})
 
 add_subdirectory(src)
 
+# Copy bootstrapping data files (cosine.txt, inverse_sine.txt) to binary dir
+file(COPY ${CMAKE_SOURCE_DIR}/src/bootstrap/cosine.txt
+          ${CMAKE_SOURCE_DIR}/src/bootstrap/inverse_sine.txt
+     DESTINATION ${CMAKE_BINARY_DIR}/bin)
+
 if(RHOMBUS_BUILD_FACE)
     add_subdirectory(src/face)
 endif()

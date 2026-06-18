@@ -8,3 +8,6 @@ set(RHOMBUS_SRC_LIST
 
 add_library(Rhombus ${RHOMBUS_SRC_LIST})
 target_link_libraries(Rhombus PUBLIC SEAL::seal)
+
+# Bootstrap sub-module (RBOOT)
+add_subdirectory(bootstrap)
