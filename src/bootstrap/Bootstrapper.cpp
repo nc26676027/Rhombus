@@ -2329,14 +2329,56 @@ void Bootstrapper::sflinv_3(Ciphertext &rtncipher, Ciphertext &cipher) { // not 
     int basicstep2 = (1 << (logn - div_part1 - div_part2));
     int basicstep3 = 1;
 
+    cout << "  [sflinv_3] step1: rotated_bsgs_linear_transform (totlen1=" << totlen1 << ")" << endl;
+    cout << "    cipher.level=" << cipher.coeff_modulus_size() << " scale=" << log2(cipher.scale()) << endl;
     Ciphertext tmpct;
-    rotated_bsgs_linear_transform(tmpct, cipher, totlen1, basicstep1, logn, invfftcoeff1[logn]);
-    evaluator.rescale_to_next_inplace(tmpct);
+    try {
+        rotated_bsgs_linear_transform(tmpct, cipher, totlen1, basicstep1, logn, invfftcoeff1[logn]);
+    } catch (const exception& e) {
+        cout << "    FAIL in rotated_bsgs_linear_transform step1: " << e.what() << endl;
+        throw;
+    }
+    cout << "    step1 done, level=" << tmpct.coeff_modulus_size() << " scale=" << log2(tmpct.scale()) << endl;
+    try {
+        evaluator.rescale_to_next_inplace(tmpct);
+    } catch (const exception& e) {
+        cout << "    FAIL in rescale step1: " << e.what() << endl;
+        throw;
+    }
+    cout << "    rescale1 done, level=" << tmpct.coeff_modulus_size() << " scale=" << log2(tmpct.scale()) << endl;
+
+    cout << "  [sflinv_3] step2: bsgs_linear_transform (totlen2=" << totlen2 << ")" << endl;
     Ciphertext tmpct2;
-    bsgs_linear_transform(tmpct2, tmpct, totlen2, basicstep2, logn, invfftcoeff2[logn]);
-    evaluator.rescale_to_next_inplace(tmpct2);
-    bsgs_linear_transform(rtncipher, tmpct2, totlen3, basicstep3, logn + 1, invfftcoeff3[logn]);
-    evaluator.rescale_to_next_inplace(rtncipher);
+    try {
+        bsgs_linear_transform(tmpct2, tmpct, totlen2, basicstep2, logn, invfftcoeff2[logn]);
+    } catch (const exception& e) {
+        cout << "    FAIL in bsgs_linear_transform step2: " << e.what() << endl;
+        throw;
+    }
+    cout << "    step2 done, level=" << tmpct2.coeff_modulus_size() << " scale=" << log2(tmpct2.scale()) << endl;
+    try {
+        evaluator.rescale_to_next_inplace(tmpct2);
+    } catch (const exception& e) {
+        cout << "    FAIL in rescale step2: " << e.what() << endl;
+        throw;
+    }
+    cout << "    rescale2 done, level=" << tmpct2.coeff_modulus_size() << " scale=" << log2(tmpct2.scale()) << endl;
+
+    cout << "  [sflinv_3] step3: bsgs_linear_transform (totlen3=" << totlen3 << ")" << endl;
+    try {
+        bsgs_linear_transform(rtncipher, tmpct2, totlen3, basicstep3, logn + 1, invfftcoeff3[logn]);
+    } catch (const exception& e) {
+        cout << "    FAIL in bsgs_linear_transform step3: " << e.what() << endl;
+        throw;
+    }
+    cout << "    step3 done, level=" << rtncipher.coeff_modulus_size() << " scale=" << log2(rtncipher.scale()) << endl;
+    try {
+        evaluator.rescale_to_next_inplace(rtncipher);
+    } catch (const exception& e) {
+        cout << "    FAIL in rescale step3: " << e.what() << endl;
+        throw;
+    }
+    cout << "  [sflinv_3] done, level=" << rtncipher.coeff_modulus_size() << " scale=" << log2(rtncipher.scale()) << endl;
 }
 
 void Bootstrapper::slim_sflinv_3(Ciphertext &rtncipher, Ciphertext &cipher) {
@@ -3120,7 +3162,11 @@ void Bootstrapper::bootstrap_sparse_3(Ciphertext &rtncipher, Ciphertext &cipher)
 
     else {
         cout << "Coefftoslot..." << endl;
+        cout << "  cipher level = " << cipher.coeff_modulus_size() << endl;
+        cout << "  cipher scale = " << cipher.scale() << endl;
+        cout << "  cipher parms chain_index = " << context.get_context_data(cipher.parms_id())->chain_index() << endl;
         coefftoslot_3(rtn, cipher);
+        cout << "  coefftoslot_3 done" << endl;
     }
     cout << "level = " << rtn.coeff_modulus_size() << endl;
 

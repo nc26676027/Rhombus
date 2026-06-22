@@ -228,7 +228,13 @@ void ModularReducer::modular_reduction(Ciphertext &rtn, Ciphertext &cipher) {
     cos_tmp1 = cipher;
     Ciphertext sin_rtn, cos_rtn;
 
-	sin_polynomial.homomorphic_poly_evaluation(context, encoder, encryptor, evaluator, relin_keys, cos_tmp2, cos_tmp1, decryptor);
+    cout << "[DIAG] before sin poly, cipher #q=" << cos_tmp1.coeff_modulus_size() << " scale=" << log2(cos_tmp1.scale()) << endl;
+    try {
+        sin_polynomial.homomorphic_poly_evaluation(context, encoder, encryptor, evaluator, relin_keys, cos_tmp2, cos_tmp1, decryptor);
+    } catch (const exception& e) {
+        cout << "[DIAG] FAIL in sin_polynomial: " << e.what() << endl;
+        throw;
+    }
     cout << "[DIAG] after sin poly, #q = " << cos_tmp2.coeff_modulus_size() << " scale=" << log2(cos_tmp2.scale()) << endl;
     {
         for (int i = 0; i < num_double_formula + 1; i++) {
